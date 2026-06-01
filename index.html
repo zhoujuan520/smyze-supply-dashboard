@@ -121,6 +121,26 @@ body.edit-mode .nav-item .nav-text{user-select:text;-webkit-user-select:text}
 .edit-toast.show{display:flex}
 .edit-toast .rst{background:#ef4444;color:#fff;border:none;padding:3px 10px;border-radius:4px;font-size:11px;cursor:pointer;margin-left:8px}
 .edit-toast .rst:hover{background:#dc2626}
+.pub-btn{background:#2563eb;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:4px;transition:.2s;margin-left:8px}
+.pub-btn:hover{background:#1d4ed8}
+.pub-btn.loading{opacity:.7;pointer-events:none}
+.pub-modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:1000;display:none;align-items:center;justify-content:center}
+.pub-modal-overlay.show{display:flex}
+.pub-modal{background:#fff;border-radius:16px;padding:28px 32px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.pub-modal h3{font-size:16px;font-weight:700;color:#111827;margin-bottom:8px}
+.pub-modal p{font-size:13px;color:#6b7280;margin-bottom:16px;line-height:1.6}
+.pub-modal input{width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:10px 14px;font-size:13px;outline:none;transition:.2s;font-family:monospace}
+.pub-modal input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.pub-modal-btns{display:flex;gap:10px;margin-top:16px;justify-content:flex-end}
+.pub-modal-btns button{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:.2s}
+.pub-modal-btns .cancel{background:#f3f4f6;color:#374151}
+.pub-modal-btns .cancel:hover{background:#e5e7eb}
+.pub-modal-btns .confirm{background:#2563eb;color:#fff}
+.pub-modal-btns .confirm:hover{background:#1d4ed8}
+.pub-status{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#e2e8f0;padding:10px 20px;border-radius:10px;font-size:12px;font-weight:500;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.15);display:none;align-items:center;gap:8px}
+.pub-status.show{display:flex}
+.pub-status.success{background:#059669}
+.pub-status.error{background:#dc2626}
 </style>
 </head>
 <body>
@@ -167,6 +187,7 @@ body.edit-mode .nav-item .nav-text{user-select:text;-webkit-user-select:text}
     <span id="clock"></span>
     <button class="export-btn">📥 导出总览</button>
     <button class="edit-toggle" id="editToggle" onclick="toggleEdit()">✏️ 编辑模式</button>
+    <button class="pub-btn" id="pubBtn" onclick="publishUpdate()">🚀 发布更新</button>
   </div>
 </div>
 
@@ -573,9 +594,97 @@ function loadEdits(){
 }
 
 loadEdits();
+
+// === 发布更新 ===
+const GH_REPO='zhoujuan520/smyze-supply-dashboard';
+const GH_FILE='index.html';
+const TK_KEY='smyze_gh_token';
+
+function getGHToken(){return localStorage.getItem(TK_KEY)||''}
+
+function showPubStatus(msg,type){
+  const el=document.createElement('div');
+  el.className='pub-status show '+(type||'');
+  el.textContent=msg;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),3500);
+}
+
+async function publishUpdate(){
+  const token=getGHToken();
+  if(!token){showTokenModal();return}
+  const btn=document.getElementById('pubBtn');
+  btn.classList.add('loading');
+  btn.textContent='⏳ 发布中...';
+  try{
+    // 清除ECharts渲染内容，还原为空容器
+    const charts=document.querySelectorAll('.ch-con');
+    charts.forEach(c=>{const inst=echarts.getInstanceByDom(c);if(inst)inst.dispose();c.innerHTML=''});
+    // 获取当前页面完整HTML
+    const html='<!DOCTYPE html>\n'+document.documentElement.outerHTML;
+    // 重新初始化图表
+    initCharts();
+    // 获取文件SHA
+    const shaRes=await fetch('https://api.github.com/repos/'+GH_REPO+'/contents/'+GH_FILE,{headers:{Authorization:'token '+token,'Accept':'application/vnd.github.v3+json'}});
+    if(!shaRes.ok)throw new Error('获取文件信息失败 ('+shaRes.status+')');
+    const shaData=await shaRes.json();
+    const sha=shaData.sha;
+    // 推送更新
+    const content=btoa(unescape(encodeURIComponent(html)));
+    const pushRes=await fetch('https://api.github.com/repos/'+GH_REPO+'/contents/'+GH_FILE,{
+      method:'PUT',
+      headers:{Authorization:'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},
+      body:JSON.stringify({message:'更新看板内容 '+new Date().toLocaleString('zh-CN'),content:content,sha:sha})
+    });
+    if(!pushRes.ok){const err=await pushRes.json();throw new Error(err.message||'推送失败')}
+    showPubStatus('✅ 发布成功！领导刷新链接即可查看','success');
+  }catch(e){
+    showPubStatus('❌ 发布失败：'+e.message,'error');
+    console.error(e);
+  }finally{
+    btn.classList.remove('loading');
+    btn.textContent='🚀 发布更新';
+  }
+}
+
+function showTokenModal(){
+  let overlay=document.getElementById('tokenModal');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='tokenModal';
+    overlay.className='pub-modal-overlay';
+    overlay.innerHTML=`
+      <div class="pub-modal">
+        <h3>🔑 设置GitHub发布令牌</h3>
+        <p>首次发布需要配置GitHub Personal Access Token，用于将更新推送到网站。<br><br>
+        <b>创建步骤：</b><br>
+        1. 打开 <a href="https://github.com/settings/tokens/new" target="_blank" style="color:#2563eb">github.com/settings/tokens/new</a><br>
+        2. Note填 <b>smyze-dashboard</b><br>
+        3. Expiration选 <b>90 days</b> 或更长<br>
+        4. 勾选 <b>repo</b> 权限（第一个大项）<br>
+        5. 点 Generate token，复制令牌粘贴到下方</p>
+        <input type="password" id="ghTokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+        <div class="pub-modal-btns">
+          <button class="cancel" onclick="document.getElementById('tokenModal').classList.remove('show')">取消</button>
+          <button class="confirm" onclick="saveToken()">保存并发布</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+  }
+  overlay.classList.add('show');
+  setTimeout(()=>{const inp=document.getElementById('ghTokenInput');if(inp)inp.focus()},100);
+}
+
+function saveToken(){
+  const inp=document.getElementById('ghTokenInput');
+  const token=inp?inp.value.trim():'';
+  if(!token||!token.startsWith('ghp_')){alert('请输入有效的GitHub令牌（以ghp_开头）');return}
+  localStorage.setItem(TK_KEY,token);
+  document.getElementById('tokenModal').classList.remove('show');
+  publishUpdate();
+}
 </script>
 
 <div class="edit-toast" id="editToast">✏️ 点击虚线框内文字即可编辑，修改自动保存至浏览器<button class="rst" onclick="resetEdits()">重置全部</button></div>
 </body>
 </html>
-<!-- build 1780307704 -->
