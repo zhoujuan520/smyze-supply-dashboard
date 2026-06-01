@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMYZE 供应链管理看板 · 尚饮i店</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'PingFang SC','Microsoft YaHei',-apple-system,sans-serif;background:#f0f2f5;color:#1f2937;display:flex;min-height:100vh}
+
+/* 左侧导航 */
+.sidebar{width:220px;background:#1e293b;color:#e2e8f0;display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;bottom:0;z-index:100}
+.sb-hdr{padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+.sb-logo{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.sb-logo-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff}
+.sb-logo-text{font-size:15px;font-weight:700;letter-spacing:.5px}
+.sb-logo-sub{font-size:11px;color:#94a3b8;margin-top:2px;padding-left:46px}
+.sb-nav{flex:1;padding:12px 0;overflow-y:auto}
+.nav-group{padding:0 12px;margin-bottom:4px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;font-size:13px;color:#94a3b8;cursor:pointer;transition:.2s;text-decoration:none;user-select:none}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#e2e8f0}
+.nav-item.active{background:rgba(16,185,129,.15);color:#10b981;font-weight:600}
+.nav-item .ni{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+.nav-sep{height:1px;background:rgba(255,255,255,.06);margin:8px 20px}
+.sb-ft{padding:14px 18px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:#64748b}
+
+/* 主区域 */
+.main{margin-left:220px;flex:1;min-width:0}
+
+/* 顶栏 */
+.topbar{background:#fff;border-bottom:1px solid #e5e7eb;padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50}
+.topbar-l{display:flex;align-items:center;gap:12px}
+.topbar-l h1{font-size:17px;font-weight:700;color:#111827}
+.topbar-badge{background:#ecfdf5;color:#059669;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600}
+.topbar-r{display:flex;align-items:center;gap:16px;font-size:13px;color:#6b7280}
+.live-dot{width:6px;height:6px;border-radius:50%;background:#10b981;display:inline-block;margin-right:4px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.export-btn{background:#10b981;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:4px}
+.export-btn:hover{background:#059669}
+
+/* 页面容器 */
+.page{display:none;padding:0 28px 28px}
+.page.active{display:block}
+
+/* KPI */
+.kpi-row{display:grid;gap:14px;padding-top:20px}
+.kpi-4{grid-template-columns:repeat(4,1fr)}
+.kpi-3{grid-template-columns:repeat(3,1fr)}
+.kpi-5{grid-template-columns:repeat(5,1fr)}
+.kpi-card{background:#fff;border-radius:12px;padding:16px 18px;border:1px solid #e5e7eb;transition:.2s}
+.kpi-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.06);transform:translateY(-1px)}
+.kpi-card.warn{border-color:#fca5a5;background:linear-gradient(135deg,#fff5f5,#fff)}
+.kpi-card.warn .kpi-val{color:#dc2626}
+.kpi-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.kpi-label{font-size:13px;color:#6b7280;font-weight:500}
+.kpi-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px}
+.kpi-val{font-size:24px;font-weight:700;color:#111827;margin-bottom:4px}
+.kpi-sub{font-size:11px;color:#9ca3af}
+.kpi-sub .hl{color:#10b981;font-weight:600}
+.kpi-sub .hl-r{color:#dc2626;font-weight:600}
+
+/* 图表网格 */
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding-top:14px}
+.charts .span2{grid-column:span 2}
+.chart-box{background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:18px 20px;transition:.2s}
+.chart-box:hover{box-shadow:0 4px 12px rgba(0,0,0,.05)}
+.ch-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.ch-hdr h3{font-size:14px;font-weight:600;color:#111827;display:flex;align-items:center;gap:6px}
+.ch-hdr h3 .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.ch-con{width:100%;height:280px}
+.ch-con.tall{height:320px}
+
+/* 告警列表 */
+.alerts{display:flex;flex-direction:column;gap:8px}
+.alert-row{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;border:1px solid #f3f4f6;background:#fafafa;transition:.15s}
+.alert-row:hover{background:#f0fdf4;border-color:#d1fae5}
+.alert-row.crit{background:#fef2f2;border-color:#fecaca}
+.alert-row.wrn{background:#fffbeb;border-color:#fde68a}
+.al-dot{width:6px;height:6px;border-radius:50%;margin-top:6px;flex-shrink:0}
+.al-dot.c{background:#dc2626}.al-dot.w{background:#f59e0b}.al-dot.i{background:#3b82f6}
+.al-body{flex:1}.al-t{font-size:12px;font-weight:600;color:#374151}.al-d{font-size:11px;color:#6b7280;margin-top:2px}
+.al-time{font-size:10px;color:#9ca3af;flex-shrink:0}
+
+/* 表格 */
+.dt{width:100%;border-collapse:collapse;font-size:12px}
+.dt th{background:#f9fafb;text-align:left;padding:9px 12px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;white-space:nowrap}
+.dt td{padding:9px 12px;border-bottom:1px solid #f3f4f6}
+.dt tr:hover td{background:#f9fafb}
+.sbar{display:inline-block;height:5px;border-radius:3px;background:#e5e7eb;width:68px;vertical-align:middle;position:relative}
+.sbar-f{height:100%;border-radius:3px;position:absolute;left:0;top:0}
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600}
+.tag-a{background:#ecfdf5;color:#059669}.tag-b{background:#eff6ff;color:#2563eb}.tag-c{background:#fef3c7;color:#d97706}.tag-d{background:#fef2f2;color:#dc2626}
+
+/* 门店小卡片 */
+.store-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.store-card{padding:10px 12px;border-radius:8px;border:1px solid #e5e7eb;background:#fafafa}
+.store-card .sn{font-size:12px;font-weight:600;color:#374151;margin-bottom:4px}
+.store-card .sv{font-size:13px;font-weight:700}
+.store-card .sv.g{color:#059669}.store-card .sv.o{color:#d97706}.store-card .sv.r{color:#dc2626}
+.store-card .sd{font-size:11px;color:#9ca3af;margin-top:2px}
+
+.ft{text-align:center;padding:16px;font-size:11px;color:#9ca3af}
+
+/* 详情卡片 */
+.info-card{background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:18px 20px}
+.info-card h4{font-size:14px;font-weight:600;color:#111827;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.info-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f3f4f6;font-size:13px}
+.info-row:last-child{border-bottom:none}
+.info-row .il{color:#6b7280}.info-row .iv{color:#111827;font-weight:500}
+
+/* 编辑模式 */
+body.edit-mode .kpi-val,body.edit-mode .kpi-label,body.edit-mode .kpi-sub,body.edit-mode .al-t,body.edit-mode .al-d,body.edit-mode .al-time,body.edit-mode .dt td:not(:has(.sbar)):not(:has(.tag)),body.edit-mode .nav-item .nav-text{outline:1.5px dashed rgba(16,185,129,.45);border-radius:3px;cursor:text;transition:outline .15s,background .15s}
+body.edit-mode .kpi-val:focus,body.edit-mode .kpi-label:focus,body.edit-mode .kpi-sub:focus,body.edit-mode .al-t:focus,body.edit-mode .al-d:focus,body.edit-mode .al-time:focus,body.edit-mode .dt td:focus,body.edit-mode .nav-item .nav-text:focus{outline:2px solid #10b981;background:#f0fdf4;border-radius:3px}
+body.edit-mode .nav-item .nav-text{user-select:text;-webkit-user-select:text}
+.edit-toggle{background:#6b7280;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:4px;transition:.2s;margin-left:8px}
+.edit-toggle:hover{background:#4b5563}
+.edit-toggle.active{background:#10b981}
+.edit-toggle.active:hover{background:#059669}
+.edit-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#e2e8f0;padding:10px 20px;border-radius:10px;font-size:12px;font-weight:500;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.15);display:none;align-items:center;gap:8px}
+.edit-toast.show{display:flex}
+.edit-toast .rst{background:#ef4444;color:#fff;border:none;padding:3px 10px;border-radius:4px;font-size:11px;cursor:pointer;margin-left:8px}
+.edit-toast .rst:hover{background:#dc2626}
+</style>
+</head>
+<body>
+
+<!-- 左侧导航 -->
+<div class="sidebar">
+  <div class="sb-hdr">
+    <div class="sb-logo">
+      <div class="sb-logo-icon">饮</div>
+      <div class="sb-logo-text">SMYZE</div>
+    </div>
+    <div class="sb-logo-sub">供应链管理看板</div>
+  </div>
+  <div class="sb-nav">
+    <div class="nav-group">
+      <div class="nav-item active" data-page="overview"><span class="ni">📊</span><span class="nav-text">总览看板</span></div>
+      <div class="nav-item" data-page="supplier"><span class="ni">🏭</span><span class="nav-text">供应商管理</span></div>
+      <div class="nav-item" data-page="inventory"><span class="ni">📦</span><span class="nav-text">仓储库存</span></div>
+      <div class="nav-item" data-page="delivery"><span class="ni">🚚</span><span class="nav-text">订货配送</span></div>
+      <div class="nav-sep"></div>
+      <div class="nav-item" data-page="cost"><span class="ni">💰</span><span class="nav-text">仓配费用</span></div>
+      <div class="nav-item" data-page="price"><span class="ni">📈</span><span class="nav-text">核心物料价格走势</span></div>
+      <div class="nav-item" data-page="newstore"><span class="ni">📍</span><span class="nav-text">新增点位</span></div>
+      <div class="nav-sep"></div>
+      <div class="nav-item" data-page="transit"><span class="ni">🚛</span><span class="nav-text">已订货在途</span></div>
+      <div class="nav-item" data-page="store"><span class="ni">🏪</span><span class="nav-text">门店信息</span></div>
+      <div class="nav-item" data-page="po"><span class="ni">📋</span><span class="nav-text">供应商订单</span></div>
+    </div>
+  </div>
+  <div class="sb-ft">尚饮（上海）实业有限公司<br>供应链管理部</div>
+</div>
+
+<!-- 主区域 -->
+<div class="main">
+
+<!-- 顶栏 -->
+<div class="topbar">
+  <div class="topbar-l">
+    <h1 id="pageTitle">供应链总览看板</h1>
+    <span class="topbar-badge">数据截至 2026.06.01</span>
+  </div>
+  <div class="topbar-r">
+    <span><span class="live-dot"></span>实时数据</span>
+    <span id="clock"></span>
+    <button class="export-btn">📥 导出总览</button>
+    <button class="edit-toggle" id="editToggle" onclick="toggleEdit()">✏️ 编辑模式</button>
+  </div>
+</div>
+
+<!-- ========== 页面1: 总览看板 ========== -->
+<div class="page active" id="page-overview">
+  <div class="kpi-row kpi-4">
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">供应商总数</span><span class="kpi-icon" style="background:#ecfdf5;color:#059669">🏭</span></div><div class="kpi-val">45<span style="font-size:14px;font-weight:400"> 家</span></div><div class="kpi-sub">其中 <span class="hl">A级 18家</span></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">库存总金额</span><span class="kpi-icon" style="background:#eff6ff;color:#2563eb">📦</span></div><div class="kpi-val">¥131,980</div><div class="kpi-sub">45 个SKU在库</div></div>
+    <div class="kpi-card warn"><div class="kpi-top"><span class="kpi-label">库存预警品项</span><span class="kpi-icon" style="background:#fef2f2;color:#dc2626">⚠️</span></div><div class="kpi-val">18<span style="font-size:14px;font-weight:400"> 项</span></div><div class="kpi-sub"><span class="hl-r">需及时补货</span></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">4月配送总金额</span><span class="kpi-icon" style="background:#fffbeb;color:#d97706">🚛</span></div><div class="kpi-val">¥182,696</div><div class="kpi-sub">覆盖 <span class="hl">30家</span> 门店</div></div>
+  </div>
+  <div class="kpi-row kpi-4" style="padding-top:10px">
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">本月仓配总费用</span><span class="kpi-icon" style="background:#f3e8ff;color:#9333ea">💰</span></div><div class="kpi-val">¥19,851</div><div class="kpi-sub">统计时间 2026年4月</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">配送覆盖点位</span><span class="kpi-icon" style="background:#ecfdf5;color:#059669">📍</span></div><div class="kpi-val">30<span style="font-size:14px;font-weight:400"> 个</span></div><div class="kpi-sub">门店配送网络</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">本月配送箱数</span><span class="kpi-icon" style="background:#eff6ff;color:#2563eb">📦</span></div><div class="kpi-val">1,169<span style="font-size:14px;font-weight:400"> 箱</span></div><div class="kpi-sub">统计时间 2026年4月</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">A级供应商占比</span><span class="kpi-icon" style="background:#ecfdf5;color:#059669">🏆</span></div><div class="kpi-val">40<span style="font-size:14px;font-weight:400">%</span></div><div class="kpi-sub">供应商质量评级</div></div>
+  </div>
+  <div class="charts">
+    <div class="chart-box span2"><div class="ch-hdr"><h3><span class="dot" style="background:#10b981"></span>月度仓配费用趋势</h3></div><div class="ch-con" id="ov-c1"></div></div>
+    <div class="chart-box">
+      <div class="ch-hdr"><h3><span class="dot" style="background:#dc2626"></span>库存预警品项</h3></div>
+      <div class="alerts">
+        <div class="alert-row crit"><div class="al-dot c"></div><div class="al-body"><div class="al-t">椰果 — 华东3仓</div><div class="al-d">库存仅2.1天，低于安全线5天</div></div><div class="al-time">2h前</div></div>
+        <div class="alert-row crit"><div class="al-dot c"></div><div class="al-body"><div class="al-t">茉莉花茶 — 总仓</div><div class="al-d">产区暴雨延迟，预计断供5-7天</div></div><div class="al-time">4h前</div></div>
+        <div class="alert-row wrn"><div class="al-dot w"></div><div class="al-body"><div class="al-t">鲜牛奶 — 华北仓</div><div class="al-d">库存3.2天，接近安全线下限</div></div><div class="al-time">6h前</div></div>
+        <div class="alert-row wrn"><div class="al-dot w"></div><div class="al-body"><div class="al-t">珍珠粉圆 — 西南仓</div><div class="al-d">供应商交货延迟，库存4.0天</div></div><div class="al-time">1d前</div></div>
+      </div>
+    </div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#2563eb"></span>供应商评级分布</h3></div><div class="ch-con" id="ov-c2"></div></div>
+    <div class="chart-box span2"><div class="ch-hdr"><h3><span class="dot" style="background:#f59e0b"></span>核心物料价格走势</h3></div><div class="ch-con" id="ov-c3"></div></div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#9333ea"></span>各区域配送准时率</h3></div><div class="ch-con" id="ov-c4"></div></div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#10b981"></span>门店库存健康度</h3></div><div class="ch-con" id="ov-c5"></div></div>
+  </div>
+</div>
+
+<!-- ========== 页面2: 供应商管理 ========== -->
+<div class="page" id="page-supplier">
+  <div class="kpi-row kpi-4">
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">供应商总数</span><span class="kpi-icon" style="background:#ecfdf5;color:#059669">🏭</span></div><div class="kpi-val">45<span style="font-size:14px;font-weight:400"> 家</span></div><div class="kpi-sub">本月新增 2 家</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">A级供应商</span><span class="kpi-icon" style="background:#ecfdf5;color:#059669">🏆</span></div><div class="kpi-val">18<span style="font-size:14px;font-weight:400"> 家</span></div><div class="kpi-sub">占比 <span class="hl">40%</span></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">平均准时交付率</span><span class="kpi-icon" style="background:#eff6ff;color:#2563eb">📋</span></div><div class="kpi-val">94.2%</div><div class="kpi-sub">较上月 <span class="hl-r">▼0.8pp</span></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">待审核供应商</span><span class="kpi-icon" style="background:#fffbeb;color:#d97706">⏳</span></div><div class="kpi-val">3<span style="font-size:14px;font-weight:400"> 家</span></div><div class="kpi-sub">资质审核中</div></div>
+  </div>
+  <div class="charts">
+    <div class="chart-box span2">
+      <div class="ch-hdr"><h3><span class="dot" style="background:#10b981"></span>供应商绩效雷达图</h3></div>
+      <div class="ch-con tall" id="sp-c1"></div>
+    </div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#2563eb"></span>供应商评级分布</h3></div><div class="ch-con" id="sp-c2"></div></div>
+    <div class="chart-box span2">
+      <div class="ch-hdr"><h3><span class="dot" style="background:#9333ea"></span>供应商交付明细</h3></div>
+      <table class="dt">
+        <thead><tr><th>供应商</th><th>品类</th><th>准时率</th><th>合格率</th><th>综合评分</th><th>等级</th><th>异常事项</th></tr></thead>
+        <tbody>
+          <tr><td>武夷星茶业</td><td>茶叶</td><td>97.2%</td><td>99.4%</td><td><span class="sbar"><span class="sbar-f" style="width:95%;background:#10b981"></span></span> 95</td><td><span class="tag tag-a">A级</span></td><td>-</td></tr>
+          <tr><td>恒天然乳业</td><td>乳制品</td><td>96.8%</td><td>99.6%</td><td><span class="sbar"><span class="sbar-f" style="width:94%;background:#10b981"></span></span> 94</td><td><span class="tag tag-a">A级</span></td><td>-</td></tr>
+          <tr><td>天味食品</td><td>糖浆/果酱</td><td>91.5%</td><td>98.8%</td><td><span class="sbar"><span class="sbar-f" style="width:89%;background:#3b82f6"></span></span> 89</td><td><span class="tag tag-a">A级</span></td><td>-</td></tr>
+          <tr><td>紫江企业</td><td>包装耗材</td><td>93.0%</td><td>99.1%</td><td><span class="sbar"><span class="sbar-f" style="width:91%;background:#10b981"></span></span> 91</td><td><span class="tag tag-a">A级</span></td><td>-</td></tr>
+          <tr><td>德馨食品</td><td>椰果/珍珠</td><td>88.2%</td><td>97.5%</td><td><span class="sbar"><span class="sbar-f" style="width:85%;background:#3b82f6"></span></span> 85</td><td><span class="tag tag-b">B级</span></td><td>交货延迟2次</td></tr>
+          <tr><td>海升果汁</td><td>浓缩果汁</td><td>92.6%</td><td>98.9%</td><td><span class="sbar"><span class="sbar-f" style="width:88%;background:#3b82f6"></span></span> 88</td><td><span class="tag tag-a">A级</span></td><td>-</td></tr>
+          <tr><td>顺大食品</td><td>椰果</td><td>84.3%</td><td>96.2%</td><td><span class="sbar"><span class="sbar-f" style="width:78%;background:#f59e0b"></span></span> 78</td><td><span class="tag tag-c">B级</span></td><td>质量波动</td></tr>
+          <tr><td>汇源果汁</td><td>果汁</td><td>82.1%</td><td>94.5%</td><td><span class="sbar"><span class="sbar-f" style="width:72%;background:#dc2626"></span></span> 72</td><td><span class="tag tag-d">C级</span></td><td>多次延迟，已约谈</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#f59e0b"></span>月度准时率趋势</h3></div><div class="ch-con" id="sp-c3"></div></div>
+  </div>
+</div>
+
+<!-- ========== 页面3: 仓储库存 ========== -->
+<div class="page" id="page-inventory">
+  <div class="kpi-row kpi-4">
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">库存总金额</span><span class="kpi-icon" style="background:#eff6ff;color:#2563eb">📦</span></div><div class="kpi-val">¥131,980</div><div class="kpi-sub">45 个SKU在库</div></div>
+    <div class="kpi-card warn"><div class="kpi-top"><span class="kpi-label">库存预警品项</span><span class="kpi-icon" style="background:#fef2f2;color:#dc2626">⚠️</span></div><div class="kpi-val">18<span style="font-size:14px;font-weight:400"> 项</span></div><div class="kpi-sub"><span class="hl-r">需及时补货</span></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">库存周转天数</span><span class="kpi-icon" style="background:#ecfdf5;color:#059669">🔄</span></div><div class="kpi-val">8.3<span style="font-size:14px;font-weight:400"> 天</span></div><div class="kpi-sub">较上月缩短 <span class="hl">0.5天</span></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">仓库数量</span><span class="kpi-icon" style="background:#f3e8ff;color:#9333ea">🏢</span></div><div class="kpi-val">6<span style="font-size:14px;font-weight:400"> 个</span></div><div class="kpi-sub">覆盖5大区域</div></div>
+  </div>
+  <div class="charts">
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#10b981"></span>库存品类结构</h3></div><div class="ch-con" id="iv-c1"></div></div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#2563eb"></span>各仓库库存金额</h3></div><div class="ch-con" id="iv-c2"></div></div>
+    <div class="chart-box span2">
+      <div class="ch-hdr"><h3><span class="dot" style="background:#dc2626"></span>库存预警明细</h3></div>
+      <table class="dt">
+        <thead><tr><th>品项</th><th>仓库</th><th>当前库存</th><th>安全库存</th><th>可用天数</th><th>状态</th><th>建议操作</th></tr></thead>
+        <tbody>
+          <tr><td>椰果</td><td>华东3仓</td><td>120kg</td><td>450kg</td><td>2.1天</td><td><span class="tag tag-d">紧急</span></td><td>立即补货</td></tr>
+          <tr><td>茉莉花茶</td><td>总仓</td><td>80kg</td><td>300kg</td><td>2.5天</td><td><span class="tag tag-d">紧急</span></td><td>紧急调拨</td></tr>
+          <tr><td>鲜牛奶</td><td>华北仓</td><td>200L</td><td>500L</td><td>3.2天</td><td><span class="tag tag-c">预警</span></td><td>3日内补货</td></tr>
+          <tr><td>珍珠粉圆</td><td>西南仓</td><td>150kg</td><td>350kg</td><td>4.0天</td><td><span class="tag tag-c">预警</span></td><td>跟进供应商</td></tr>
+          <tr><td>果糖</td><td>华南仓</td><td>180kg</td><td>400kg</td><td>4.5天</td><td><span class="tag tag-c">预警</span></td><td>已下单在途</td></tr>
+          <tr><td>杯盖</td><td>华东1仓</td><td>5,000个</td><td>12,000个</td><td>4.8天</td><td><span class="tag tag-c">预警</span></td><td>下单中</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#9333ea"></span>库存周转趋势</h3></div><div class="ch-con" id="iv-c3"></div></div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#f59e0b"></span>出入库趋势(月)</h3></div><div class="ch-con" id="iv-c4"></div></div>
+  </div>
+</div>
+
+<!-- ========== 页面4: 订货配送 ========== -->
+<div class="page" id="page-delivery">
+  <div class="kpi-row kpi-4">
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">4月配送总金额</span><span class="kpi-icon" style="background:#fffbeb;color:#d97706">🚛</span></div><div class="kpi-val">¥182,696</div><div class="kpi-sub">覆盖 <span class="hl">30家</span> 门店</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">本月配送箱数</span><span class="kpi-icon" style="background:#eff6ff;color:#2563eb">📦</span></div><div class="kpi-val">1,169<span style="font-size:14px;font-weight:400"> 箱</span></div><div class="kpi-sub">日均39箱</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">配送准时率</span><span class="kpi-icon" style="background:#ecfdf5;color:#059669">✅</span></div><div class="kpi-val">94.5%</div><div class="kpi-sub">较上月 <span class="hl-r">▼0.6pp</span></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">配送覆盖点位</span><span class="kpi-icon" style="background:#ecfdf5;color:#059669">📍</span></div><div class="kpi-val">30<span style="font-size:14px;font-weight:400"> 个</span></div><div class="kpi-sub">6条配送线路</div></div>
+  </div>
+  <div class="charts">
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#9333ea"></span>各区域配送准时率</h3></div><div class="ch-con" id="dl-c1"></div></div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#10b981"></span>月度配送量趋势</h3></div><div class="ch-con" id="dl-c2"></div></div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#3b82f6"></span>配送金额按区域</h3></div><div class="ch-con" id="dl-c3"></div></div>
+    <div class="chart-box">
+      <div class="ch-hdr"><h3><span class="dot" style="background:#dc2626"></span>配送异常记录</h3></div>
+      <div class="alerts">
+        <div class="alert-row crit"><div class="al-dot c"></div><div class="al-body"><div class="al-t">华东-杭州西湖店</div><div class="al-d">5月28日配送延迟6小时，司机临时更换</div></div><div class="al-time">3d前</div></div>
+        <div class="alert-row wrn"><div class="al-dot w"></div><div class="al-body"><div class="al-t">华北-北京朝阳店</div><div class="al-d">5月25日少配椰果1箱，已补发</div></div><div class="al-time">7d前</div></div>
+        <div class="alert-row wrn"><div class="al-dot w"></div><div class="al-body"><div class="al-t">华南-广州天河店</div><div class="al-d">5月22日鲜奶到货温度偏高，已拒收</div></div><div class="al-time">10d前</div></div>
+        <div class="alert-row"><div class="al-dot i"></div><div class="al-body"><div class="al-t">西南-成都春熙店</div><div class="al-d">5月20日配送提前到达，门店未开门</div></div><div class="al-time">12d前</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 页面5: 仓配费用 ========== -->
+<div class="page" id="page-cost">
+  <div class="kpi-row kpi-3">
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">本月仓配总费用</span><span class="kpi-icon" style="background:#f3e8ff;color:#9333ea">💰</span></div><div class="kpi-val">¥19,851</div><div class="kpi-sub">仓储费 ¥5.8k + 物流费 ¥14.1k</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">费用率(占配送额)</span><span class="kpi-icon" style="background:#eff6ff;color:#2563eb">📊</span></div><div class="kpi-val">10.9%</div><div class="kpi-sub">较上月 <span class="hl">▼0.3pp</span></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">单箱配送成本</span><span class="kpi-icon" style="background:#ecfdf5;color:#059669">📦</span></div><div class="kpi-val">¥16.99</div><div class="kpi-sub">较上月 <span class="hl-r">▲¥0.8</span></div></div>
+  </div>
+  <div class="charts">
+    <div class="chart-box span2"><div class="ch-hdr"><h3><span class="dot" style="background:#10b981"></span>月度仓配费用趋势</h3></div><div class="ch-con tall" id="co-c1"></div></div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#9333ea"></span>费用构成</h3></div><div class="ch-con" id="co-c2"></div></div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#f59e0b"></span>各仓库费用对比</h3></div><div class="ch-con" id="co-c3"></div></div>
+  </div>
+</div>
+
+<!-- ========== 页面6: 核心物料价格走势 ========== -->
+<div class="page" id="page-price">
+  <div class="kpi-row kpi-5">
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">茉莉花茶</span><span class="kpi-icon" style="background:#fef2f2;color:#dc2626">📈</span></div><div class="kpi-val">¥156<span style="font-size:12px;font-weight:400">/kg</span></div><div class="kpi-sub"><span class="hl-r">▲21.9%</span> 半年涨幅</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">鲜牛奶</span><span class="kpi-icon" style="background:#fffbeb;color:#d97706">📈</span></div><div class="kpi-val">¥14.3<span style="font-size:12px;font-weight:400">/L</span></div><div class="kpi-sub"><span class="hl-r">▲14.4%</span> 半年涨幅</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">果糖</span><span class="kpi-icon" style="background:#ecfdf5;color:#059669">📉</span></div><div class="kpi-val">¥6.8<span style="font-size:12px;font-weight:400">/kg</span></div><div class="kpi-sub"><span class="hl-r">▲9.7%</span> 半年涨幅</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">椰果</span><span class="kpi-icon" style="background:#fef2f2;color:#dc2626">📈</span></div><div class="kpi-val">¥20.2<span style="font-size:12px;font-weight:400">/kg</span></div><div class="kpi-sub"><span class="hl-r">▲9.2%</span> 半年涨幅</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">珍珠粉圆</span><span class="kpi-icon" style="background:#ecfdf5;color:#059669">➡️</span></div><div class="kpi-val">¥12.5<span style="font-size:12px;font-weight:400">/kg</span></div><div class="kpi-sub">价格平稳</div></div>
+  </div>
+  <div class="charts">
+    <div class="chart-box span2"><div class="ch-hdr"><h3><span class="dot" style="background:#f59e0b"></span>核心物料价格走势(近6月)</h3></div><div class="ch-con tall" id="pr-c1"></div></div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#10b981"></span>月度采购量趋势</h3></div><div class="ch-con" id="pr-c2"></div></div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#dc2626"></span>价格波动预警</h3></div>
+      <div class="alerts">
+        <div class="alert-row crit"><div class="al-dot c"></div><div class="al-body"><div class="al-t">茉莉花茶单月涨幅9.9%</div><div class="al-d">6月¥156/kg，较5月涨¥14，产区暴雨致减产</div></div></div>
+        <div class="alert-row wrn"><div class="al-dot w"></div><div class="al-body"><div class="al-t">鲜牛奶持续上涨</div><div class="al-d">连续3月上涨，光明报价上调8%</div></div></div>
+        <div class="alert-row"><div class="al-dot i"></div><div class="al-body"><div class="al-t">椰果价格创半年新高</div><div class="al-d">6月¥20.2/kg，建议锁价采购</div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 页面7: 新增点位 ========== -->
+<div class="page" id="page-newstore">
+  <div class="kpi-row kpi-4">
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">本月新增点位</span><span class="kpi-icon" style="background:#ecfdf5;color:#059669">📍</span></div><div class="kpi-val">6<span style="font-size:14px;font-weight:400"> 个</span></div><div class="kpi-sub">全年累计 <span class="hl">32个</span></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">已开业</span><span class="kpi-icon" style="background:#ecfdf5;color:#059669">✅</span></div><div class="kpi-val">2<span style="font-size:14px;font-weight:400"> 家</span></div><div class="kpi-sub">杭州·西湖银泰 / 上海·五角场</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">装修中</span><span class="kpi-icon" style="background:#fffbeb;color:#d97706">🔨</span></div><div class="kpi-val">2<span style="font-size:14px;font-weight:400"> 家</span></div><div class="kpi-sub">南京·新街口 / 成都·太古里</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">待进场</span><span class="kpi-icon" style="background:#eff6ff;color:#2563eb">📋</span></div><div class="kpi-val">2<span style="font-size:14px;font-weight:400"> 家</span></div><div class="kpi-sub">深圳·海岸城 / 武汉·光谷</div></div>
+  </div>
+  <div class="charts">
+    <div class="chart-box">
+      <div class="ch-hdr"><h3><span class="dot" style="background:#10b981"></span>新点位详情</h3></div>
+      <div class="store-grid" style="grid-template-columns:repeat(2,1fr)">
+        <div class="store-card"><div class="sn">杭州·西湖银泰店</div><div class="sv g">✅ 已开业</div><div class="sd">5月18日开业 · 首周日均营业额¥8,200</div></div>
+        <div class="store-card"><div class="sn">上海·五角场店</div><div class="sv g">✅ 已开业</div><div class="sd">5月25日开业 · 首周日均营业额¥9,500</div></div>
+        <div class="store-card"><div class="sn">南京·新街口店</div><div class="sv o">🔨 装修中</div><div class="sd">预计6月15日完工 · 设备已入库</div></div>
+        <div class="store-card"><div class="sn">成都·太古里店</div><div class="sv o">🔨 装修中</div><div class="sd">预计6月20日完工 · 原料已备</div></div>
+        <div class="store-card"><div class="sn">深圳·海岸城店</div><div class="sv r">📋 待进场</div><div class="sd">合同已签 · 预计7月初进场</div></div>
+        <div class="store-card"><div class="sn">武汉·光谷店</div><div class="sv r">📋 待进场</div><div class="sd">装修方案确认中 · 预计7月中进场</div></div>
+      </div>
+    </div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#3b82f6"></span>月度新增点位趋势</h3></div><div class="ch-con" id="ns-c1"></div></div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#9333ea"></span>新点位供应链就绪状态</h3></div><div class="ch-con" id="ns-c2"></div></div>
+  </div>
+</div>
+
+<!-- ========== 页面8: 已订货在途 ========== -->
+<div class="page" id="page-transit">
+  <div class="kpi-row kpi-4">
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">在途订单数</span><span class="kpi-icon" style="background:#eff6ff;color:#2563eb">🚛</span></div><div class="kpi-val">46<span style="font-size:14px;font-weight:400"> 单</span></div><div class="kpi-sub">涉及 7个品类</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">在途总金额</span><span class="kpi-icon" style="background:#fffbeb;color:#d97706">💰</span></div><div class="kpi-val">¥85.1<span style="font-size:14px;font-weight:400">万</span></div><div class="kpi-sub">预计7日内到货</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">延迟订单</span><span class="kpi-icon" style="background:#fef2f2;color:#dc2626">⚠️</span></div><div class="kpi-val">3<span style="font-size:14px;font-weight:400"> 单</span></div><div class="kpi-sub"><span class="hl-r">需关注</span></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">今日预计到货</span><span class="kpi-icon" style="background:#ecfdf5;color:#059669">📦</span></div><div class="kpi-val">8<span style="font-size:14px;font-weight:400"> 单</span></div><div class="kpi-sub">金额 ¥12.3万</div></div>
+  </div>
+  <div class="charts">
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#3b82f6"></span>在途订单品类分布</h3></div><div class="ch-con" id="tr-c1"></div></div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#f59e0b"></span>预计到货时间分布</h3></div><div class="ch-con" id="tr-c2"></div></div>
+    <div class="chart-box span2">
+      <div class="ch-hdr"><h3><span class="dot" style="background:#dc2626"></span>在途订单明细</h3></div>
+      <table class="dt">
+        <thead><tr><th>订单号</th><th>供应商</th><th>品类</th><th>数量</th><th>金额</th><th>发货日</th><th>预计到货</th><th>状态</th></tr></thead>
+        <tbody>
+          <tr><td>PO-20260528-001</td><td>武夷星茶业</td><td>茶叶</td><td>500kg</td><td>¥78,000</td><td>5/28</td><td>6/03</td><td><span class="tag tag-a">运输中</span></td></tr>
+          <tr><td>PO-20260529-003</td><td>恒天然乳业</td><td>乳制品</td><td>2,000L</td><td>¥28,600</td><td>5/29</td><td>6/01</td><td><span class="tag tag-a">运输中</span></td></tr>
+          <tr><td>PO-20260530-002</td><td>紫江企业</td><td>包装耗材</td><td>50,000套</td><td>¥15,500</td><td>5/30</td><td>6/05</td><td><span class="tag tag-a">已发货</span></td></tr>
+          <tr><td>PO-20260527-005</td><td>顺大食品</td><td>椰果</td><td>800kg</td><td>¥16,160</td><td>5/27</td><td>6/02</td><td><span class="tag tag-d">延迟</span></td></tr>
+          <tr><td>PO-20260531-001</td><td>天味食品</td><td>糖浆</td><td>1,200kg</td><td>¥9,600</td><td>5/31</td><td>6/04</td><td><span class="tag tag-c">待发货</span></td></tr>
+          <tr><td>PO-20260525-004</td><td>鑫荣懋果业</td><td>鲜果</td><td>3,000kg</td><td>¥18,000</td><td>5/25</td><td>5/30</td><td><span class="tag tag-d">延迟</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 页面9: 门店信息 ========== -->
+<div class="page" id="page-store">
+  <div class="kpi-row kpi-4">
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">门店总数</span><span class="kpi-icon" style="background:#ecfdf5;color:#059669">🏪</span></div><div class="kpi-val">32<span style="font-size:14px;font-weight:400"> 家</span></div><div class="kpi-sub">覆盖5大区域</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">运营中</span><span class="kpi-icon" style="background:#ecfdf5;color:#059669">✅</span></div><div class="kpi-val">30<span style="font-size:14px;font-weight:400"> 家</span></div><div class="kpi-sub">正常运行</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">装修筹备中</span><span class="kpi-icon" style="background:#fffbeb;color:#d97706">🔨</span></div><div class="kpi-val">2<span style="font-size:14px;font-weight:400"> 家</span></div><div class="kpi-sub">南京 / 成都</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">平均单店月配送额</span><span class="kpi-icon" style="background:#eff6ff;color:#2563eb">📊</span></div><div class="kpi-val">¥6,090</div><div class="kpi-sub">较上月 <span class="hl">▲5.2%</span></div></div>
+  </div>
+  <div class="charts">
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#10b981"></span>门店区域分布</h3></div><div class="ch-con" id="st-c1"></div></div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#3b82f6"></span>门店月配送额TOP10</h3></div><div class="ch-con" id="st-c2"></div></div>
+    <div class="chart-box span2">
+      <div class="ch-hdr"><h3><span class="dot" style="background:#9333ea"></span>门店清单</h3></div>
+      <table class="dt">
+        <thead><tr><th>门店编号</th><th>门店名称</th><th>区域</th><th>状态</th><th>4月配送额</th><th>4月配送箱数</th><th>机器人台数</th></tr></thead>
+        <tbody>
+          <tr><td>SH001</td><td>上海·南京东路店</td><td>华东</td><td><span class="tag tag-a">运营中</span></td><td>¥9,850</td><td>62箱</td><td>3台</td></tr>
+          <tr><td>SH002</td><td>上海·五角场店</td><td>华东</td><td><span class="tag tag-a">运营中</span></td><td>¥9,500</td><td>58箱</td><td>3台</td></tr>
+          <tr><td>HZ001</td><td>杭州·西湖银泰店</td><td>华东</td><td><span class="tag tag-a">运营中</span></td><td>¥8,200</td><td>52箱</td><td>2台</td></tr>
+          <tr><td>GZ001</td><td>广州·天河城店</td><td>华南</td><td><span class="tag tag-a">运营中</span></td><td>¥7,600</td><td>48箱</td><td>2台</td></tr>
+          <tr><td>BJ001</td><td>北京·朝阳大悦城</td><td>华北</td><td><span class="tag tag-a">运营中</span></td><td>¥7,200</td><td>45箱</td><td>2台</td></tr>
+          <tr><td>CD001</td><td>成都·春熙路店</td><td>西南</td><td><span class="tag tag-a">运营中</span></td><td>¥6,800</td><td>43箱</td><td>2台</td></tr>
+          <tr><td>NJ001</td><td>南京·新街口店</td><td>华东</td><td><span class="tag tag-c">装修中</span></td><td>-</td><td>-</td><td>2台(已备)</td></tr>
+          <tr><td>CD002</td><td>成都·太古里店</td><td>西南</td><td><span class="tag tag-c">装修中</span></td><td>-</td><td>-</td><td>2台(已备)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 页面10: 供应商订单 ========== -->
+<div class="page" id="page-po">
+  <div class="kpi-row kpi-4">
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">本月采购订单</span><span class="kpi-icon" style="background:#eff6ff;color:#2563eb">📋</span></div><div class="kpi-val">128<span style="font-size:14px;font-weight:400"> 单</span></div><div class="kpi-sub">较上月 <span class="hl">▲12单</span></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">采购总金额</span><span class="kpi-icon" style="background:#fffbeb;color:#d97706">💰</span></div><div class="kpi-val">¥487<span style="font-size:14px;font-weight:400">万</span></div><div class="kpi-sub">超预算 <span class="hl-r">3.2%</span></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">订单完成率</span><span class="kpi-icon" style="background:#ecfdf5;color:#059669">✅</span></div><div class="kpi-val">96.8%</div><div class="kpi-sub">较上月 <span class="hl">▲1.2pp</span></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">待审批订单</span><span class="kpi-icon" style="background:#f3e8ff;color:#9333ea">⏳</span></div><div class="kpi-val">5<span style="font-size:14px;font-weight:400"> 单</span></div><div class="kpi-sub">金额 ¥23.6万</div></div>
+  </div>
+  <div class="charts">
+    <div class="chart-box span2"><div class="ch-hdr"><h3><span class="dot" style="background:#10b981"></span>月度采购订单趋势</h3></div><div class="ch-con tall" id="po-c1"></div></div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#9333ea"></span>采购品类分布</h3></div><div class="ch-con" id="po-c2"></div></div>
+    <div class="chart-box"><div class="ch-hdr"><h3><span class="dot" style="background:#f59e0b"></span>各供应商采购额</h3></div><div class="ch-con" id="po-c3"></div></div>
+    <div class="chart-box span2">
+      <div class="ch-hdr"><h3><span class="dot" style="background:#3b82f6"></span>近期采购订单</h3></div>
+      <table class="dt">
+        <thead><tr><th>订单号</th><th>供应商</th><th>品类</th><th>数量</th><th>金额</th><th>下单日</th><th>交货日</th><th>状态</th></tr></thead>
+        <tbody>
+          <tr><td>PO-20260531-001</td><td>天味食品</td><td>糖浆</td><td>1,200kg</td><td>¥9,600</td><td>5/31</td><td>6/04</td><td><span class="tag tag-c">待发货</span></td></tr>
+          <tr><td>PO-20260530-001</td><td>武夷星茶业</td><td>茶叶</td><td>800kg</td><td>¥124,800</td><td>5/30</td><td>6/05</td><td><span class="tag tag-a">已确认</span></td></tr>
+          <tr><td>PO-20260530-002</td><td>紫江企业</td><td>包装耗材</td><td>50,000套</td><td>¥15,500</td><td>5/30</td><td>6/05</td><td><span class="tag tag-a">已发货</span></td></tr>
+          <tr><td>PO-20260529-002</td><td>恒天然乳业</td><td>乳制品</td><td>3,000L</td><td>¥42,900</td><td>5/29</td><td>6/03</td><td><span class="tag tag-a">运输中</span></td></tr>
+          <tr><td>PO-20260528-002</td><td>德馨食品</td><td>椰果/珍珠</td><td>600kg</td><td>¥12,600</td><td>5/28</td><td>6/01</td><td><span class="tag tag-a">运输中</span></td></tr>
+          <tr><td>PO-20260527-003</td><td>海升果汁</td><td>浓缩果汁</td><td>1,500kg</td><td>¥22,500</td><td>5/27</td><td>5/31</td><td><span class="tag tag-a">已到货</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="ft">尚饮（上海）实业有限公司 · 供应链管理部 ｜ 数据更新：每日 08:00 / 14:00 / 20:00 ｜ SMYZE Supply Chain Dashboard v2.1</div>
+</div>
+
+<script>
+// === 导航切换 ===
+const titles={overview:'供应链总览看板',supplier:'供应商管理',inventory:'仓储库存',delivery:'订货配送',cost:'仓配费用',price:'核心物料价格走势',newstore:'新增点位',transit:'已订货在途',store:'门店信息',po:'供应商订单'};
+document.querySelectorAll('.nav-item').forEach(item=>{
+  item.addEventListener('click',function(){
+    if(editMode)return;
+    const page=this.dataset.page;if(!page)return;
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    this.classList.add('active');
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.getElementById('page-'+page).classList.add('active');
+    document.getElementById('pageTitle').textContent=titles[page]||'';
+    setTimeout(()=>{document.querySelectorAll('.ch-con').forEach(el=>{const c=echarts.getInstanceByDom(el);c&&c.resize()})},50);
+  });
+});
+
+!function u(){const n=new Date();document.getElementById('clock').textContent=n.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});setTimeout(u,1000)}();
+
+const B={tooltip:{trigger:'axis',backgroundColor:'#fff',borderColor:'#e5e7eb',textStyle:{color:'#374151'},boxShadow:'0 4px 12px rgba(0,0,0,.1)'},legend:{textStyle:{color:'#6b7280',fontSize:11}},grid:{left:50,right:20,top:40,bottom:30}};
+const BA={...B,tooltip:{trigger:'item',backgroundColor:'#fff',borderColor:'#e5e7eb',textStyle:{color:'#374151'}}};
+
+function initCharts(){
+// === 总览 ===
+echarts.init(document.getElementById('ov-c1')).setOption({...B,legend:{...B.legend,data:['仓储费','物流费'],right:16,top:4},xAxis:{type:'category',data:['25/11','25/12','26/01','26/02','26/03','26/04'],axisLine:{lineStyle:{color:'#e5e7eb'}},axisLabel:{color:'#9ca3af',fontSize:11}},yAxis:{type:'value',axisLabel:{color:'#9ca3af',fontSize:11,formatter:'¥{value}k'},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},series:[{name:'仓储费',type:'line',smooth:true,symbol:'circle',symbolSize:6,lineStyle:{color:'#10b981',width:2.5},itemStyle:{color:'#10b981'},areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(16,185,129,0.15)'},{offset:1,color:'rgba(16,185,129,0)'}]}},data:[3.8,5.1,6.6,5.2,4.9,5.8]},{name:'物流费',type:'line',smooth:true,symbol:'circle',symbolSize:6,lineStyle:{color:'#3b82f6',width:2.5},itemStyle:{color:'#3b82f6'},areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(59,130,246,0.15)'},{offset:1,color:'rgba(59,130,246,0)'}]}},data:[7.9,12.8,12.3,10.5,11.2,14.1]}]});
+echarts.init(document.getElementById('ov-c2')).setOption({...BA,series:[{type:'pie',radius:['45%','72%'],center:['50%','52%'],itemStyle:{borderColor:'#fff',borderWidth:3},label:{color:'#6b7280',fontSize:11,formatter:'{b}\n{c}家 ({d}%)'},labelLine:{lineStyle:{color:'#d1d5db'}},data:[{value:18,name:'A级',itemStyle:{color:'#10b981'}},{value:15,name:'B级',itemStyle:{color:'#3b82f6'}},{value:9,name:'C级',itemStyle:{color:'#f59e0b'}},{value:3,name:'待评估',itemStyle:{color:'#9ca3af'}}]}]});
+echarts.init(document.getElementById('ov-c3')).setOption({...B,legend:{...B.legend,data:['茉莉花茶','鲜牛奶','果糖','椰果'],right:16,top:4},xAxis:{type:'category',data:['1月','2月','3月','4月','5月','6月'],axisLine:{lineStyle:{color:'#e5e7eb'}},axisLabel:{color:'#9ca3af',fontSize:11}},yAxis:{type:'value',axisLabel:{color:'#9ca3af',fontSize:11},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},series:[{name:'茉莉花茶',type:'line',smooth:true,lineStyle:{color:'#10b981',width:2},itemStyle:{color:'#10b981'},data:[128,132,130,135,142,156]},{name:'鲜牛奶',type:'line',smooth:true,lineStyle:{color:'#3b82f6',width:2},itemStyle:{color:'#3b82f6'},data:[12.5,12.8,12.6,13.0,13.2,14.3]},{name:'果糖',type:'line',smooth:true,lineStyle:{color:'#f59e0b',width:2},itemStyle:{color:'#f59e0b'},data:[6.2,6.1,6.3,6.5,6.4,6.8]},{name:'椰果',type:'line',smooth:true,lineStyle:{color:'#9333ea',width:2},itemStyle:{color:'#9333ea'},data:[18.5,18.2,18.8,19.0,19.5,20.2]}]});
+echarts.init(document.getElementById('ov-c4')).setOption({...B,grid:{left:70,right:20,top:20,bottom:30},xAxis:{type:'value',max:100,axisLabel:{color:'#9ca3af',fontSize:11,formatter:'{value}%'},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},yAxis:{type:'category',data:['西南','华南','华中','华北','东北','华东'],axisLabel:{color:'#6b7280',fontSize:11},axisLine:{lineStyle:{color:'#e5e7eb'}}},series:[{type:'bar',barWidth:14,itemStyle:{borderRadius:[0,6,6,0],color:function(p){const v=p.value;return v>=95?new echarts.graphic.LinearGradient(0,0,1,0,[{offset:0,color:'#10b981'},{offset:1,color:'#34d399'}]):v>=90?new echarts.graphic.LinearGradient(0,0,1,0,[{offset:0,color:'#3b82f6'},{offset:1,color:'#60a5fa'}]):new echarts.graphic.LinearGradient(0,0,1,0,[{offset:0,color:'#f59e0b'},{offset:1,color:'#fbbf24'}])}},data:[97.2,95.8,94.5,93.1,91.8,88.6],label:{show:true,position:'right',color:'#374151',fontSize:11,formatter:'{c}%'}}]});
+echarts.init(document.getElementById('ov-c5')).setOption({...B,legend:{...B.legend,data:['健康','预警','紧急'],right:16,top:4},xAxis:{type:'category',data:['华东','华南','华北','华中','西南','东北'],axisLine:{lineStyle:{color:'#e5e7eb'}},axisLabel:{color:'#9ca3af',fontSize:11}},yAxis:{type:'value',axisLabel:{color:'#9ca3af',fontSize:11},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},series:[{name:'健康',type:'bar',stack:'t',barWidth:20,itemStyle:{color:'#10b981'},data:[68,52,42,35,28,18]},{name:'预警',type:'bar',stack:'t',itemStyle:{color:'#f59e0b'},data:[12,8,6,5,4,3]},{name:'紧急',type:'bar',stack:'t',itemStyle:{color:'#dc2626',borderRadius:[4,4,0,0]},data:[5,3,2,1,2,1]}]});
+
+// === 供应商 ===
+const sn=['武夷星','恒天然','天味','紫江','德馨','海升','顺大','鑫荣懋','汇源','古树茶'];
+echarts.init(document.getElementById('sp-c1')).setOption({...B,legend:{...B.legend,data:['质量','交付','成本','服务'],right:16,top:4},radar:{indicator:sn.map(n=>({name:n,max:100})),shape:'polygon',axisName:{color:'#6b7280',fontSize:10},splitArea:{areaStyle:{color:['#fafafa','#f3f4f6']}},axisLine:{lineStyle:{color:'#e5e7eb'}},splitLine:{lineStyle:{color:'#e5e7eb'}}},series:[{type:'radar',data:[{value:[96,95,92,94,90,88,85,87,83,91],name:'质量',lineStyle:{color:'#10b981'},areaStyle:{color:'rgba(16,185,129,.08)'},itemStyle:{color:'#10b981'}},{value:[93,97,88,91,94,90,92,85,89,88],name:'交付',lineStyle:{color:'#3b82f6'},areaStyle:{color:'rgba(59,130,246,.08)'},itemStyle:{color:'#3b82f6'}},{value:[88,82,94,90,86,91,93,88,85,90],name:'成本',lineStyle:{color:'#f59e0b'},areaStyle:{color:'rgba(245,158,11,.08)'},itemStyle:{color:'#f59e0b'}},{value:[92,90,87,88,91,85,89,82,86,89],name:'服务',lineStyle:{color:'#9333ea'},areaStyle:{color:'rgba(147,51,234,.08)'},itemStyle:{color:'#9333ea'}}]}]});
+echarts.init(document.getElementById('sp-c2')).setOption({...BA,series:[{type:'pie',radius:['45%','72%'],center:['50%','52%'],itemStyle:{borderColor:'#fff',borderWidth:3},label:{color:'#6b7280',fontSize:11,formatter:'{b}\n{c}家'},labelLine:{lineStyle:{color:'#d1d5db'}},data:[{value:18,name:'A级',itemStyle:{color:'#10b981'}},{value:15,name:'B级',itemStyle:{color:'#3b82f6'}},{value:9,name:'C级',itemStyle:{color:'#f59e0b'}},{value:3,name:'待评估',itemStyle:{color:'#9ca3af'}}]}]});
+echarts.init(document.getElementById('sp-c3')).setOption({...B,legend:{...B.legend,data:['准时率'],right:16,top:4},xAxis:{type:'category',data:['1月','2月','3月','4月','5月','6月'],axisLine:{lineStyle:{color:'#e5e7eb'}},axisLabel:{color:'#9ca3af',fontSize:11}},yAxis:{type:'value',min:88,max:100,axisLabel:{color:'#9ca3af',fontSize:11,formatter:'{value}%'},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},series:[{name:'准时率',type:'line',smooth:true,lineStyle:{color:'#3b82f6',width:2.5},itemStyle:{color:'#3b82f6'},areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(59,130,246,0.15)'},{offset:1,color:'rgba(59,130,246,0)'}]}},data:[92.8,93.5,94.1,95.0,95.0,94.2]}]});
+
+// === 仓储库存 ===
+echarts.init(document.getElementById('iv-c1')).setOption({...BA,series:[{type:'pie',radius:['42%','72%'],center:['50%','52%'],roseType:'radius',itemStyle:{borderColor:'#fff',borderWidth:3},label:{color:'#6b7280',fontSize:10,formatter:'{b}\n{d}%'},labelLine:{lineStyle:{color:'#d1d5db'}},data:[{value:42,name:'茶叶原料',itemStyle:{color:'#10b981'}},{value:28,name:'乳制品',itemStyle:{color:'#3b82f6'}},{value:18,name:'糖浆果酱',itemStyle:{color:'#f59e0b'}},{value:15,name:'水果鲜品',itemStyle:{color:'#9333ea'}},{value:12,name:'包装耗材',itemStyle:{color:'#22d3ee'}},{value:8,name:'机器人配件',itemStyle:{color:'#f472b6'}},{value:5,name:'其他',itemStyle:{color:'#6b7280'}}]}]});
+echarts.init(document.getElementById('iv-c2')).setOption({...B,xAxis:{type:'category',data:['总仓','华东1仓','华东3仓','华北仓','华南仓','西南仓'],axisLine:{lineStyle:{color:'#e5e7eb'}},axisLabel:{color:'#9ca3af',fontSize:11}},yAxis:{type:'value',axisLabel:{color:'#9ca3af',fontSize:11,formatter:'¥{value}k'},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},series:[{type:'bar',barWidth:24,itemStyle:{borderRadius:[6,6,0,0],color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'#3b82f6'},{offset:1,color:'rgba(59,130,246,0.3)'}])},data:[38.5,28.2,18.6,22.1,15.8,8.8]}]});
+echarts.init(document.getElementById('iv-c3')).setOption({...B,legend:{...B.legend,data:['周转天数'],right:16,top:4},xAxis:{type:'category',data:['1月','2月','3月','4月','5月','6月'],axisLine:{lineStyle:{color:'#e5e7eb'}},axisLabel:{color:'#9ca3af',fontSize:11}},yAxis:{type:'value',min:6,max:12,axisLabel:{color:'#9ca3af',fontSize:11,formatter:'{value}天'},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},series:[{type:'line',smooth:true,lineStyle:{color:'#10b981',width:2.5},itemStyle:{color:'#10b981'},areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(16,185,129,0.15)'},{offset:1,color:'rgba(16,185,129,0)'}]}},data:[10.2,9.8,9.5,9.0,8.8,8.3]}]});
+echarts.init(document.getElementById('iv-c4')).setOption({...B,legend:{...B.legend,data:['入库','出库'],right:16,top:4},xAxis:{type:'category',data:['1月','2月','3月','4月','5月','6月'],axisLine:{lineStyle:{color:'#e5e7eb'}},axisLabel:{color:'#9ca3af',fontSize:11}},yAxis:{type:'value',axisLabel:{color:'#9ca3af',fontSize:11,formatter:'¥{value}k'},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},series:[{name:'入库',type:'bar',barWidth:16,itemStyle:{borderRadius:[4,4,0,0],color:'#3b82f6'},data:[120,115,128,135,130,142]},{name:'出库',type:'bar',barWidth:16,itemStyle:{borderRadius:[4,4,0,0],color:'#f59e0b'},data:[108,112,120,128,125,138]}]});
+
+// === 订货配送 ===
+echarts.init(document.getElementById('dl-c1')).setOption({...B,grid:{left:70,right:20,top:20,bottom:30},xAxis:{type:'value',max:100,axisLabel:{color:'#9ca3af',fontSize:11,formatter:'{value}%'},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},yAxis:{type:'category',data:['西南','华南','华中','华北','东北','华东'],axisLabel:{color:'#6b7280',fontSize:11},axisLine:{lineStyle:{color:'#e5e7eb'}}},series:[{type:'bar',barWidth:14,itemStyle:{borderRadius:[0,6,6,0],color:function(p){const v=p.value;return v>=95?'#10b981':v>=90?'#3b82f6':'#f59e0b'}},data:[97.2,95.8,94.5,93.1,91.8,88.6],label:{show:true,position:'right',color:'#374151',fontSize:11,formatter:'{c}%'}}]});
+echarts.init(document.getElementById('dl-c2')).setOption({...B,legend:{...B.legend,data:['配送箱数','配送金额(万)'],right:16,top:4},xAxis:{type:'category',data:['1月','2月','3月','4月','5月','6月'],axisLine:{lineStyle:{color:'#e5e7eb'}},axisLabel:{color:'#9ca3af',fontSize:11}},yAxis:[{type:'value',name:'箱',nameTextStyle:{color:'#9ca3af'},axisLabel:{color:'#9ca3af',fontSize:11},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},{type:'value',name:'万元',nameTextStyle:{color:'#9ca3af'},axisLabel:{color:'#9ca3af',fontSize:11},splitLine:{show:false},axisLine:{show:false}}],series:[{name:'配送箱数',type:'bar',barWidth:16,itemStyle:{borderRadius:[4,4,0,0],color:'#3b82f6'},data:[980,1020,1050,1169,1100,1150]},{name:'配送金额(万)',type:'line',yAxisIndex:1,smooth:true,lineStyle:{color:'#f59e0b',width:2.5},itemStyle:{color:'#f59e0b'},data:[15.2,16.1,16.8,18.3,17.5,18.1]}]});
+echarts.init(document.getElementById('dl-c3')).setOption({...BA,series:[{type:'pie',radius:['45%','72%'],center:['50%','52%'],itemStyle:{borderColor:'#fff',borderWidth:3},label:{color:'#6b7280',fontSize:11,formatter:'{b}\n¥{c}k'},labelLine:{lineStyle:{color:'#d1d5db'}},data:[{value:68.5,name:'华东',itemStyle:{color:'#3b82f6'}},{value:42.3,name:'华南',itemStyle:{color:'#10b981'}},{value:28.6,name:'华北',itemStyle:{color:'#9333ea'}},{value:22.1,name:'华中',itemStyle:{color:'#f59e0b'}},{value:14.8,name:'西南',itemStyle:{color:'#22d3ee'}},{value:6.4,name:'东北',itemStyle:{color:'#6b7280'}}]}]});
+
+// === 仓配费用 ===
+echarts.init(document.getElementById('co-c1')).setOption({...B,legend:{...B.legend,data:['仓储费','物流费','合计'],right:16,top:4},xAxis:{type:'category',data:['25/11','25/12','26/01','26/02','26/03','26/04'],axisLine:{lineStyle:{color:'#e5e7eb'}},axisLabel:{color:'#9ca3af',fontSize:11}},yAxis:{type:'value',axisLabel:{color:'#9ca3af',fontSize:11,formatter:'¥{value}k'},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},series:[{name:'仓储费',type:'bar',stack:'f',barWidth:20,itemStyle:{color:'#10b981',borderRadius:[0,0,0,0]},data:[3.8,5.1,6.6,5.2,4.9,5.8]},{name:'物流费',type:'bar',stack:'f',barWidth:20,itemStyle:{color:'#3b82f6',borderRadius:[4,4,0,0]},data:[7.9,12.8,12.3,10.5,11.2,14.1]},{name:'合计',type:'line',smooth:true,symbol:'circle',symbolSize:6,lineStyle:{color:'#f59e0b',width:2.5},itemStyle:{color:'#f59e0b'},data:[11.7,17.9,18.9,15.7,16.1,19.9]}]});
+echarts.init(document.getElementById('co-c2')).setOption({...BA,series:[{type:'pie',radius:['45%','72%'],center:['50%','52%'],itemStyle:{borderColor:'#fff',borderWidth:3},label:{color:'#6b7280',fontSize:11,formatter:'{b}\n¥{c}k'},labelLine:{lineStyle:{color:'#d1d5db'}},data:[{value:5.8,name:'仓储费',itemStyle:{color:'#10b981'}},{value:8.6,name:'干线物流',itemStyle:{color:'#3b82f6'}},{value:3.2,name:'城配',itemStyle:{color:'#f59e0b'}},{value:1.5,name:'装卸费',itemStyle:{color:'#9333ea'}},{value:0.7,name:'其他',itemStyle:{color:'#6b7280'}}]}]});
+echarts.init(document.getElementById('co-c3')).setOption({...B,xAxis:{type:'category',data:['总仓','华东仓','华北仓','华南仓','西南仓','东北仓'],axisLine:{lineStyle:{color:'#e5e7eb'}},axisLabel:{color:'#9ca3af',fontSize:11}},yAxis:{type:'value',axisLabel:{color:'#9ca3af',fontSize:11,formatter:'¥{value}k'},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},series:[{type:'bar',barWidth:20,itemStyle:{borderRadius:[6,6,0,0],color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'#9333ea'},{offset:1,color:'rgba(147,51,234,0.3)'}])},data:[5.2,4.8,3.5,2.8,2.1,1.4]}]});
+
+// === 核心物料价格 ===
+echarts.init(document.getElementById('pr-c1')).setOption({...B,legend:{...B.legend,data:['茉莉花茶','鲜牛奶','果糖','椰果','珍珠粉圆'],right:16,top:4},xAxis:{type:'category',data:['1月','2月','3月','4月','5月','6月'],axisLine:{lineStyle:{color:'#e5e7eb'}},axisLabel:{color:'#9ca3af',fontSize:11}},yAxis:{type:'value',axisLabel:{color:'#9ca3af',fontSize:11},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},series:[{name:'茉莉花茶',type:'line',smooth:true,lineStyle:{color:'#10b981',width:2},itemStyle:{color:'#10b981'},data:[128,132,130,135,142,156]},{name:'鲜牛奶',type:'line',smooth:true,lineStyle:{color:'#3b82f6',width:2},itemStyle:{color:'#3b82f6'},data:[12.5,12.8,12.6,13.0,13.2,14.3]},{name:'果糖',type:'line',smooth:true,lineStyle:{color:'#f59e0b',width:2},itemStyle:{color:'#f59e0b'},data:[6.2,6.1,6.3,6.5,6.4,6.8]},{name:'椰果',type:'line',smooth:true,lineStyle:{color:'#9333ea',width:2},itemStyle:{color:'#9333ea'},data:[18.5,18.2,18.8,19.0,19.5,20.2]},{name:'珍珠粉圆',type:'line',smooth:true,lineStyle:{color:'#6b7280',width:2},itemStyle:{color:'#6b7280'},data:[12.0,12.1,12.2,12.3,12.4,12.5]}]});
+echarts.init(document.getElementById('pr-c2')).setOption({...B,legend:{...B.legend,data:['茶叶','乳制品','糖浆','水果','包装'],right:16,top:4},xAxis:{type:'category',data:['1月','2月','3月','4月','5月','6月'],axisLine:{lineStyle:{color:'#e5e7eb'}},axisLabel:{color:'#9ca3af',fontSize:11}},yAxis:{type:'value',axisLabel:{color:'#9ca3af',fontSize:11,formatter:'{value}吨'},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},series:[{name:'茶叶',type:'bar',stack:'t',barWidth:16,itemStyle:{color:'#10b981'},data:[2.8,2.5,3.0,2.9,3.2,3.5]},{name:'乳制品',type:'bar',stack:'t',itemStyle:{color:'#3b82f6'},data:[5.2,4.8,5.5,5.0,5.3,5.8]},{name:'糖浆',type:'bar',stack:'t',itemStyle:{color:'#f59e0b'},data:[1.5,1.2,1.8,1.6,1.4,1.7]},{name:'水果',type:'bar',stack:'t',itemStyle:{color:'#9333ea'},data:[3.0,2.8,3.2,3.5,3.1,3.6]},{name:'包装',type:'bar',stack:'t',itemStyle:{color:'#22d3ee',borderRadius:[4,4,0,0]},data:[0.8,0.6,0.9,0.7,0.8,1.0]}]});
+
+// === 新增点位 ===
+echarts.init(document.getElementById('ns-c1')).setOption({...B,xAxis:{type:'category',data:['1月','2月','3月','4月','5月','6月'],axisLine:{lineStyle:{color:'#e5e7eb'}},axisLabel:{color:'#9ca3af',fontSize:11}},yAxis:{type:'value',min:0,max:8,axisLabel:{color:'#9ca3af',fontSize:11,formatter:'{value}个'},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},series:[{type:'bar',barWidth:20,itemStyle:{borderRadius:[6,6,0,0],color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'#10b981'},{offset:1,color:'rgba(16,185,129,0.3)'}])},data:[3,4,5,6,8,6]}]});
+echarts.init(document.getElementById('ns-c2')).setOption({...B,legend:{...B.legend,data:['已就绪','部分就绪','未就绪'],right:16,top:4},xAxis:{type:'category',data:['西湖银泰','五角场','新街口','太古里','海岸城','光谷'],axisLine:{lineStyle:{color:'#e5e7eb'}},axisLabel:{color:'#9ca3af',fontSize:10}},yAxis:{type:'value',axisLabel:{color:'#9ca3af',fontSize:11},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},series:[{name:'已就绪',type:'bar',stack:'t',barWidth:20,itemStyle:{color:'#10b981'},data:[5,5,3,3,1,1]},{name:'部分就绪',type:'bar',stack:'t',itemStyle:{color:'#f59e0b'},data:[0,0,2,2,2,1]},{name:'未就绪',type:'bar',stack:'t',itemStyle:{color:'#dc2626',borderRadius:[4,4,0,0]},data:[0,0,0,0,2,3]}]});
+
+// === 已订货在途 ===
+echarts.init(document.getElementById('tr-c1')).setOption({...B,legend:{...B.legend,data:['订单数','金额(万)'],right:16,top:4},xAxis:{type:'category',data:['茶叶','乳制品','糖浆','水果','包装','椰果','配件'],axisLine:{lineStyle:{color:'#e5e7eb'}},axisLabel:{color:'#9ca3af',fontSize:11}},yAxis:[{type:'value',name:'单',nameTextStyle:{color:'#9ca3af',fontSize:10},axisLabel:{color:'#9ca3af',fontSize:11},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},{type:'value',name:'万元',nameTextStyle:{color:'#9ca3af',fontSize:10},axisLabel:{color:'#9ca3af',fontSize:11},splitLine:{show:false},axisLine:{show:false}}],series:[{name:'订单数',type:'bar',barWidth:16,itemStyle:{borderRadius:[4,4,0,0],color:'#3b82f6'},data:[12,8,6,5,9,4,2]},{name:'金额(万)',type:'line',yAxisIndex:1,smooth:true,lineStyle:{color:'#f59e0b',width:2.5},itemStyle:{color:'#f59e0b'},data:[28.5,15.2,8.6,12.3,4.8,6.5,9.2]}]});
+echarts.init(document.getElementById('tr-c2')).setOption({...BA,series:[{type:'pie',radius:['45%','72%'],center:['50%','52%'],itemStyle:{borderColor:'#fff',borderWidth:3},label:{color:'#6b7280',fontSize:11,formatter:'{b}\n{c}单'},labelLine:{lineStyle:{color:'#d1d5db'}},data:[{value:8,name:'今日到货',itemStyle:{color:'#10b981'}},{value:15,name:'3日内',itemStyle:{color:'#3b82f6'}},{value:12,name:'5日内',itemStyle:{color:'#f59e0b'}},{value:8,name:'7日内',itemStyle:{color:'#9333ea'}},{value:3,name:'延迟',itemStyle:{color:'#dc2626'}}]}]});
+
+// === 门店信息 ===
+echarts.init(document.getElementById('st-c1')).setOption({...BA,series:[{type:'pie',radius:['45%','72%'],center:['50%','52%'],itemStyle:{borderColor:'#fff',borderWidth:3},label:{color:'#6b7280',fontSize:11,formatter:'{b}\n{c}家'},labelLine:{lineStyle:{color:'#d1d5db'}},data:[{value:12,name:'华东',itemStyle:{color:'#3b82f6'}},{value:8,name:'华南',itemStyle:{color:'#10b981'}},{value:5,name:'华北',itemStyle:{color:'#9333ea'}},{value:4,name:'华中',itemStyle:{color:'#f59e0b'}},{value:3,name:'西南',itemStyle:{color:'#22d3ee'}}]}]});
+echarts.init(document.getElementById('st-c2')).setOption({...B,grid:{left:100,right:20,top:10,bottom:30},xAxis:{type:'value',axisLabel:{color:'#9ca3af',fontSize:11,formatter:'¥{value}k'},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},yAxis:{type:'category',data:['南京东路','五角场','西湖银泰','天河城','朝阳大悦城','春熙路','静安寺','城西银泰','光谷步行街','太古里'],axisLabel:{color:'#6b7280',fontSize:11},axisLine:{lineStyle:{color:'#e5e7eb'}}},series:[{type:'bar',barWidth:14,itemStyle:{borderRadius:[0,6,6,0],color:new echarts.graphic.LinearGradient(0,0,1,0,[{offset:0,color:'#10b981'},{offset:1,color:'#34d399'}])},data:[9.85,9.50,8.20,7.60,7.20,6.80,6.50,6.20,5.80,5.50]}]});
+
+// === 供应商订单 ===
+echarts.init(document.getElementById('po-c1')).setOption({...B,legend:{...B.legend,data:['订单数','金额(万)','完成率(%)'],right:16,top:4},xAxis:{type:'category',data:['1月','2月','3月','4月','5月','6月'],axisLine:{lineStyle:{color:'#e5e7eb'}},axisLabel:{color:'#9ca3af',fontSize:11}},yAxis:[{type:'value',name:'单/万',nameTextStyle:{color:'#9ca3af',fontSize:10},axisLabel:{color:'#9ca3af',fontSize:11},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},{type:'value',name:'%',min:88,max:100,nameTextStyle:{color:'#9ca3af',fontSize:10},axisLabel:{color:'#9ca3af',fontSize:11},splitLine:{show:false},axisLine:{show:false}}],series:[{name:'订单数',type:'bar',barWidth:16,itemStyle:{borderRadius:[4,4,0,0],color:'#3b82f6'},data:[98,105,112,108,116,128]},{name:'金额(万)',type:'bar',barWidth:16,itemStyle:{borderRadius:[4,4,0,0],color:'#f59e0b'},data:[398,412,438,420,462,487]},{name:'完成率(%)',type:'line',yAxisIndex:1,smooth:true,lineStyle:{color:'#10b981',width:2.5},itemStyle:{color:'#10b981'},data:[93.2,94.1,95.0,94.8,95.6,96.8]}]});
+echarts.init(document.getElementById('po-c2')).setOption({...BA,series:[{type:'pie',radius:['45%','72%'],center:['50%','52%'],itemStyle:{borderColor:'#fff',borderWidth:3},label:{color:'#6b7280',fontSize:10,formatter:'{b}\n{d}%'},labelLine:{lineStyle:{color:'#d1d5db'}},data:[{value:198,name:'原料采购',itemStyle:{color:'#10b981'}},{value:86,name:'乳制品',itemStyle:{color:'#3b82f6'}},{value:72,name:'包装耗材',itemStyle:{color:'#f59e0b'}},{value:65,name:'糖浆果酱',itemStyle:{color:'#9333ea'}},{value:38,name:'设备配件',itemStyle:{color:'#22d3ee'}},{value:28,name:'其他',itemStyle:{color:'#6b7280'}}]}]});
+echarts.init(document.getElementById('po-c3')).setOption({...B,grid:{left:80,right:20,top:10,bottom:30},xAxis:{type:'value',axisLabel:{color:'#9ca3af',fontSize:11,formatter:'¥{value}万'},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},yAxis:{type:'category',data:['武夷星','恒天然','紫江企业','天味食品','海升果汁','德馨食品','鑫荣懋','顺大食品'],axisLabel:{color:'#6b7280',fontSize:11},axisLine:{lineStyle:{color:'#e5e7eb'}}},series:[{type:'bar',barWidth:14,itemStyle:{borderRadius:[0,6,6,0],color:new echarts.graphic.LinearGradient(0,0,1,0,[{offset:0,color:'#9333ea'},{offset:1,color:'#a78bfa'}])},data:[156,98,72,65,48,38,32,18]}]});
+}
+
+initCharts();
+window.addEventListener('resize',()=>{document.querySelectorAll('.ch-con').forEach(el=>{const c=echarts.getInstanceByDom(el);c&&c.resize()})});
+
+// === 编辑模式 ===
+const EDIT_KEY='smyze_dashboard_edits';
+let editMode=false;
+
+function getEditableTargets(){
+  const t=[];
+  document.querySelectorAll('.nav-text').forEach(e=>t.push(e));
+  document.querySelectorAll('.kpi-val,.kpi-label,.kpi-sub').forEach(e=>t.push(e));
+  document.querySelectorAll('.al-t,.al-d,.al-time').forEach(e=>t.push(e));
+  document.querySelectorAll('.dt td').forEach(e=>{
+    if(!e.querySelector('.sbar')&&!e.querySelector('.tag')) t.push(e);
+  });
+  return t;
+}
+
+function assignEditIds(){
+  getEditableTargets().forEach((e,i)=>{if(!e.dataset.editId) e.dataset.editId='e-'+i});
+}
+
+function toggleEdit(){
+  editMode=!editMode;
+  document.body.classList.toggle('edit-mode',editMode);
+  const btn=document.getElementById('editToggle');
+  btn.classList.toggle('active',editMode);
+  btn.innerHTML=editMode?'✏️ 编辑中':'✏️ 编辑模式';
+  document.getElementById('editToast').classList.toggle('show',editMode);
+  assignEditIds();
+  getEditableTargets().forEach(e=>{e.contentEditable=editMode?'true':'false'});
+}
+
+document.addEventListener('focusout',function(e){
+  if(!editMode)return;
+  const el=e.target;
+  if(el.dataset&&el.dataset.editId){
+    const edits=JSON.parse(localStorage.getItem(EDIT_KEY)||'{}');
+    edits[el.dataset.editId]=el.innerHTML;
+    localStorage.setItem(EDIT_KEY,JSON.stringify(edits));
+  }
+});
+
+function resetEdits(){
+  localStorage.removeItem(EDIT_KEY);
+  location.reload();
+}
+
+function loadEdits(){
+  assignEditIds();
+  const edits=JSON.parse(localStorage.getItem(EDIT_KEY)||'{}');
+  if(!Object.keys(edits).length)return;
+  getEditableTargets().forEach(el=>{
+    const saved=edits[el.dataset.editId];
+    if(saved)el.innerHTML=saved;
+  });
+}
+
+loadEdits();
+</script>
+
+<div class="edit-toast" id="editToast">✏️ 点击虚线框内文字即可编辑，修改自动保存至浏览器<button class="rst" onclick="resetEdits()">重置全部</button></div>
+</body>
+</html>
