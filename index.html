@@ -438,16 +438,37 @@ updateClock();setInterval(updateClock,60000);
 const B={toolbox:{right:20,top:4,feature:{saveAsImage:{}}},tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},grid:{left:20,right:20,top:20,bottom:30,containLabel:true},legend:{bottom:0,textStyle:{color:'#6b7280',fontSize:11}}};
 const BA={toolbox:{right:20,top:4,feature:{saveAsImage:{}}},tooltip:{trigger:'item',formatter:'{b}: {c} ({d}%)'}};
 
+// 初始化锁，防止重复初始化
+let chartsInitialized = false;
+let initAttempts = 0;
+const MAX_INIT_ATTEMPTS = 20;
+
 // 清除所有旧图表实例
 function disposeAllCharts(){
   document.querySelectorAll('.ch-con').forEach(el=>{
     const instance=echarts.getInstanceByDom(el);
-    if(instance){instance.dispose();}
+    if(instance){
+      instance.dispose();
+      el.innerHTML = ''; // 清空容器
+    }
   });
 }
 
 function initCharts(){
-disposeAllCharts();
+  // 如果ECharts未加载，直接返回
+  if(typeof echarts === 'undefined'){
+    console.log('ECharts未加载，跳过初始化');
+    return;
+  }
+  
+  // 防止重复初始化
+  if(chartsInitialized && initAttempts > 0){
+    console.log('图表已初始化，跳过重复调用');
+    return;
+  }
+  
+  disposeAllCharts();
+  initAttempts++;
 echarts.init(document.getElementById('ov-c1')).setOption({...B,legend:{...B.legend,data:['仓储费','物流费','合计'],right:16,top:4},xAxis:{type:'category',data:['25/11','25/12','26/01','26/02','26/03','26/04'],axisLine:{lineStyle:{color:'#e5e7eb'}},axisLabel:{color:'#9ca3af',fontSize:11}},yAxis:{type:'value',axisLabel:{color:'#9ca3af',fontSize:11,formatter:'¥{value}k'},splitLine:{lineStyle:{color:'#f3f4f6',type:'dashed'}},axisLine:{show:false}},series:[{name:'仓储费',type:'bar',stack:'f',barWidth:20,itemStyle:{color:'#10b981',borderRadius:[0,0,0,0]},data:[3.8,5.1,6.6,4.7,4.6,6.6]},{name:'物流费',type:'bar',stack:'f',barWidth:20,itemStyle:{color:'#3b82f6',borderRadius:[4,4,0,0]},data:[7.9,12.8,12.3,15.1,9.4,12.3]},{name:'合计',type:'line',smooth:true,symbol:'circle',symbolSize:6,lineStyle:{color:'#f59e0b',width:2.5},itemStyle:{color:'#f59e0b'},data:[11.7,17.9,18.9,19.7,14.0,18.9]}]});
 
 // 总览-供应商评级分布
@@ -497,6 +518,7 @@ echarts.init(document.getElementById('st-c1')).setOption({...BA,series:[{type:'p
 
 // 门店信息-点位性质
 echarts.init(document.getElementById('st-c2')).setOption({...BA,series:[{type:'pie',radius:['45%','72%'],center:['50%','52%'],itemStyle:{borderColor:'#fff',borderWidth:3},label:{color:'#6b7280',fontSize:10,formatter:'{b}\n{c}个'},labelLine:{lineStyle:{color:'#d1d5db'}},data:[{value:12,name:'交通枢纽',itemStyle:{color:'#10b981'}},{value:12,name:'办公区',itemStyle:{color:'#3b82f6'}},{value:3,name:'景区',itemStyle:{color:'#f59e0b'}},{value:3,name:'学校',itemStyle:{color:'#9333ea'}},{value:1,name:'门店',itemStyle:{color:'#22d3ee'}},{value:1,name:'其他',itemStyle:{color:'#6b7280'}}]}]});
+  chartsInitialized = true;
 }
 
 // 导航切换时重新渲染图表
@@ -511,17 +533,23 @@ const navClickHandler = () => {
       document.getElementById('pageTitle').textContent = item.querySelector('.nav-text').textContent;
       // 延迟执行图表resize，确保页面切换动画完成
       setTimeout(() => {
+        // 导航切换时重置初始化状态，允许重新初始化
+        chartsInitialized = false;
+        initAttempts = 0;
+        
         document.querySelectorAll('.ch-con').forEach(el => {
           const c = echarts.getInstanceByDom(el);
           if (c) {
             c.resize();
           } else {
-            // 如果图表实例不存在，重新初始化
+            // 如果图表实例不存在，清空容器等待重新初始化
             el.innerHTML = '';
           }
         });
-        // 重新初始化当前页面的图表
+        // 重新初始化所有图表
         initCharts();
+        // 标记为已初始化
+        chartsInitialized = true;
       }, 150);
     });
   });
@@ -589,18 +617,26 @@ function loadEdits(){
 }
 
 loadEdits();
-// 等待ECharts加载完成后初始化
+// 等待ECharts加载完成后初始化（增加等待时间和重试机制）
 function waitForEchartsAndInit() {
-    if (typeof echarts !== 'undefined') {
-        console.log('ECharts已加载，开始初始化图表');
+    initAttempts++;
+    
+    if (typeof echarts !== 'undefined' && typeof echarts.init === 'function') {
+        console.log('ECharts已加载，开始初始化图表 (尝试次数: ' + initAttempts + ')');
+        chartsInitialized = false; // 重置状态
         initCharts();
+        chartsInitialized = true; // 标记完成
     } else {
-        console.log('等待ECharts加载...');
-        setTimeout(waitForEchartsAndInit, 300);
+        if (initAttempts < MAX_INIT_ATTEMPTS) {
+            console.log('等待ECharts加载... (尝试 ' + initAttempts + '/' + MAX_INIT_ATTEMPTS + ')');
+            setTimeout(waitForEchartsAndInit, 500); // 增加等待间隔到500ms
+        } else {
+            console.error('ECharts加载超时，请检查网络连接');
+        }
     }
 }
 // 页面加载完成后延迟初始化，确保DOM和CDN脚本都已加载
-setTimeout(waitForEchartsAndInit, 500);
+setTimeout(waitForEchartsAndInit, 1000); // 增加初始等待时间到1000ms
 
 // 发布更新
 const GH_REPO='zhoujuan520/smyze-supply-dashboard';
@@ -627,7 +663,11 @@ async function publishUpdate(){
     const charts=document.querySelectorAll('.ch-con');
     charts.forEach(c=>{const inst=echarts.getInstanceByDom(c);if(inst)inst.dispose();c.innerHTML=''});
     const html='<!DOCTYPE html>\n'+document.documentElement.outerHTML;
+    // 发布时强制重新初始化
+    chartsInitialized = false;
+    initAttempts = 0;
     initCharts();
+    chartsInitialized = true;
     const shaRes=await fetch('https://api.github.com/repos/'+GH_REPO+'/contents/'+GH_FILE,{headers:{Authorization:'token '+token,'Accept':'application/vnd.github.v3+json'}});
     if(!shaRes.ok)throw new Error('获取文件信息失败 ('+shaRes.status+')');
     const shaData=await shaRes.json();
