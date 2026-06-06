@@ -523,9 +523,13 @@ echarts.init(document.getElementById('st-c1')).setOption({...BA,series:[{type:'p
 echarts.init(document.getElementById('st-c2')).setOption({...BA,series:[{type:'pie',radius:['45%','72%'],center:['50%','52%'],itemStyle:{borderColor:'#fff',borderWidth:3},label:{color:'#6b7280',fontSize:10,formatter:'{b}\n{c}个'},labelLine:{lineStyle:{color:'#d1d5db'}},data:[{value:12,name:'交通枢纽',itemStyle:{color:'#10b981'}},{value:12,name:'办公区',itemStyle:{color:'#3b82f6'}},{value:3,name:'景区',itemStyle:{color:'#f59e0b'}},{value:3,name:'学校',itemStyle:{color:'#9333ea'}},{value:1,name:'门店',itemStyle:{color:'#22d3ee'}},{value:1,name:'其他',itemStyle:{color:'#6b7280'}}]}]});
     chartsInitialized = true;
     console.log('图表初始化完成！');
+    const debugPanel = document.getElementById('debugPanel');
+    if(debugPanel) debugPanel.innerHTML = '✅ 图表加载完成!';
     return true;
   } catch(e) {
     console.error('图表初始化失败:', e);
+    const debugPanel = document.getElementById('debugPanel');
+    if(debugPanel) debugPanel.innerHTML = '❌ 初始化失败: ' + e.message;
     return false;
   }
 }
@@ -616,19 +620,29 @@ function loadEdits(){
 
 loadEdits();
 
+// 添加调试状态提示
+const debugPanel = document.createElement('div');
+debugPanel.style.cssText = 'position:fixed;bottom:10px;right:10px;background:#000;color:#0f0;padding:8px 12px;border-radius:6px;font-size:12px;z-index:9999;font-family:monospace;';
+debugPanel.id = 'debugPanel';
+debugPanel.innerHTML = '⏳ 图表加载中...';
+document.body.appendChild(debugPanel);
+
 // 等待ECharts加载完成后初始化
 const MAX_INIT_ATTEMPTS = 30;
 function waitForEchartsAndInit() {
     initAttempts++;
     
     if (typeof echarts !== 'undefined' && typeof echarts.init === 'function') {
+        debugPanel.innerHTML = '✅ ECharts已加载，开始初始化...';
         console.log('ECharts已加载，开始初始化图表');
         initCharts();
     } else {
         if (initAttempts < MAX_INIT_ATTEMPTS) {
+            debugPanel.innerHTML = '⏳ 等待ECharts加载... (' + initAttempts + ')';
             console.log('等待ECharts加载... (' + initAttempts + '/' + MAX_INIT_ATTEMPTS + ')');
             setTimeout(waitForEchartsAndInit, 300);
         } else {
+            debugPanel.innerHTML = '❌ ECharts加载超时';
             console.error('ECharts加载超时，请检查网络连接');
         }
     }
@@ -637,11 +651,13 @@ function waitForEchartsAndInit() {
 // DOM加载完成后执行初始化
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
+        debugPanel.innerHTML = '✅ DOM已加载，等待ECharts...';
         console.log('DOM已加载，等待ECharts...');
         setTimeout(waitForEchartsAndInit, 500);
     });
 } else {
     // DOM已经加载完成
+    debugPanel.innerHTML = '✅ DOM已就绪，等待ECharts...';
     console.log('DOM已就绪，等待ECharts...');
     setTimeout(waitForEchartsAndInit, 500);
 }
