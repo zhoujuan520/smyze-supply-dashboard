@@ -425,20 +425,7 @@ body.edit-mode .nav-item .nav-text{user-select:text;-webkit-user-select:text}
 </div>
 </body>
 <script>
-// 导航切换
-document.querySelectorAll('.nav-item').forEach(item=>{
-  item.addEventListener('click',()=>{
-    document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
-    item.classList.add('active');
-    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-    const page=item.dataset.page;
-    document.getElementById('page-'+page).classList.add('active');
-    document.getElementById('pageTitle').textContent=item.querySelector('.nav-text').textContent;
-    setTimeout(()=>{
-      document.querySelectorAll('.ch-con').forEach(el=>{const c=echarts.getInstanceByDom(el);c&&c.resize()});
-    },100);
-  });
-});
+// 导航切换 - 统一在底部处理
 
 // 时钟
 function updateClock(){
@@ -504,8 +491,48 @@ echarts.init(document.getElementById('st-c1')).setOption({...BA,series:[{type:'p
 echarts.init(document.getElementById('st-c2')).setOption({...BA,series:[{type:'pie',radius:['45%','72%'],center:['50%','52%'],itemStyle:{borderColor:'#fff',borderWidth:3},label:{color:'#6b7280',fontSize:10,formatter:'{b}\n{c}个'},labelLine:{lineStyle:{color:'#d1d5db'}},data:[{value:12,name:'交通枢纽',itemStyle:{color:'#10b981'}},{value:12,name:'办公区',itemStyle:{color:'#3b82f6'}},{value:3,name:'景区',itemStyle:{color:'#f59e0b'}},{value:3,name:'学校',itemStyle:{color:'#9333ea'}},{value:1,name:'门店',itemStyle:{color:'#22d3ee'}},{value:1,name:'其他',itemStyle:{color:'#6b7280'}}]}]});
 }
 
-initCharts();
-window.addEventListener('resize',()=>{document.querySelectorAll('.ch-con').forEach(el=>{const c=echarts.getInstanceByDom(el);c&&c.resize()})});
+// 确保DOM准备好后初始化图表
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', initCharts);
+} else {
+  initCharts();
+}
+
+// 导航切换时重新渲染图表
+const navClickHandler = () => {
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      const page = item.dataset.page;
+      document.getElementById('page-' + page).classList.add('active');
+      document.getElementById('pageTitle').textContent = item.querySelector('.nav-text').textContent;
+      // 延迟执行图表resize，确保页面切换动画完成
+      setTimeout(() => {
+        document.querySelectorAll('.ch-con').forEach(el => {
+          const c = echarts.getInstanceByDom(el);
+          if (c) {
+            c.resize();
+          } else {
+            // 如果图表实例不存在，重新初始化
+            el.innerHTML = '';
+          }
+        });
+        // 重新初始化当前页面的图表
+        initCharts();
+      }, 150);
+    });
+  });
+};
+navClickHandler();
+
+window.addEventListener('resize', () => {
+  document.querySelectorAll('.ch-con').forEach(el => {
+    const c = echarts.getInstanceByDom(el);
+    if (c) c.resize();
+  });
+});
 
 // 编辑模式
 const EDIT_KEY='smyze_dashboard_edits';
