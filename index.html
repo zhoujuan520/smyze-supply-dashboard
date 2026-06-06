@@ -443,7 +443,6 @@ function disposeAllCharts(){
   document.querySelectorAll('.ch-con').forEach(el=>{
     const instance=echarts.getInstanceByDom(el);
     if(instance){instance.dispose();}
-    el.innerHTML='';
   });
 }
 
@@ -590,7 +589,18 @@ function loadEdits(){
 }
 
 loadEdits();
-initCharts();
+// 等待ECharts加载完成后初始化
+function waitForEchartsAndInit() {
+    if (typeof echarts !== 'undefined') {
+        console.log('ECharts已加载，开始初始化图表');
+        initCharts();
+    } else {
+        console.log('等待ECharts加载...');
+        setTimeout(waitForEchartsAndInit, 300);
+    }
+}
+// 页面加载完成后延迟初始化，确保DOM和CDN脚本都已加载
+setTimeout(waitForEchartsAndInit, 500);
 
 // 发布更新
 const GH_REPO='zhoujuan520/smyze-supply-dashboard';
